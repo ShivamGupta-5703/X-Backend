@@ -1,0 +1,34 @@
+{
+  "name": "x-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node build/index",
+    "build": "tsc -p .",
+    "dev": "tsc-watch --onSuccess \"npm start\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/cors": "^2.8.17",
+    "@types/jsonwebtoken": "^9.0.6",
+    "prisma": "^5.11.0",
+    "tsc-watch": "^6.0.4",
+    "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.10.1",
+    "@prisma/client": "^5.11.0",
+    "axios": "^1.6.8",
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "graphql": "^16.8.1",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
