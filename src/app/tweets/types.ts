@@ -2,7 +2,7 @@ export const types = `#graphql
 
     input CreateTweetData{
         content: String!
-        imgUrl: String
+        imageURL: String
     }
 
     input LikeUnlikeTweetData{
