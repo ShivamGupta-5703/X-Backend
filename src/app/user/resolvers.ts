@@ -1,68 +1,14 @@
-import JWTService from "../../services/jwt";                                                                                                                                        import axios from "axios";
 import { prismaClient } from "../../clients/db";
 import { GraphqlContext } from "../interfaces";
 import { User } from "@prisma/client";
+import UserService from "../../services/user";
 
-interface GoogleTokenResult {
-    iss?:           string;
-    azp?:           string;
-    aud?:           string;
-    sub?:           string;
-    email?:         string;
-    email_verified?:string;
-    nbf?:           string;
-    name?:          string;
-    picture?:       string;
-    given_name?:    string;
-    family_name?:   string;
-    iat?:           string;
-    exp?:           string;
-    jti?:           string;
-    alg?:           string;
-    kid?:           string;
-    typ?:           string;
-}
+
 
 const queries = {
     verifyGoogleToken : async (parent : any, {token} : {token : string}) =>{
-        const googleToken = token;
-        const googleOauthURL = new URL("https://oauth2.googleapis.com/tokeninfo");
-        googleOauthURL.searchParams.set("id_token", googleToken);
-
-        const {data} = await axios.get<GoogleTokenResult>(googleOauthURL.toString(),{
-            responseType :'json',
-        });
-        
-        // find user
-        const checkForUser = await prismaClient.user.findUnique({where : {email : data.email}});
-
-        // if no user found, create one
-        if(!checkForUser){
-            const user = await prismaClient.user.create({
-                data : {
-                    email : data.email, 
-                    firstname : data.given_name!,
-                    lastname : data.family_name,
-                    profileImageURL : data.picture
-                },
-            });
-        }
-
-        // find user from db
-        const userInDb = await prismaClient.user.findUnique({
-            where : {email : data.email}
-        });
-
-        // if not found, throw error
-        if(!userInDb){
-            throw new Error("User not found");
-        }
-
-        // generate token for user
-        const userToken = JWTService.generateTokenForUser(userInDb);
-
-        //return token
-        return userToken;
+        const resultToken = await UserService.verifyGoogleAuthToken(token);
+        return resultToken;
     },
     
     getCurrentUser : async (parent : any, args : any, context : GraphqlContext) =>{
@@ -71,32 +17,58 @@ const queries = {
         if(!id){
             return null;
         }
-        const user = await prismaClient.user.findUnique({
-            where : {id}
-        })
+        const user = await UserService.getUserById(id);
         //console.log(user);
         
         return user;
     },
 
     getUserById : async (parent : any,{id} : {id : string}, context : GraphqlContext) =>{
-        const user = await prismaClient.user.findUnique({
-            where : {id}
-        })
+        const user = await UserService.getUserById(id);
         //console.log(user);
         
         return user;
     }
-
-
 }
 
 const extraResolvers = {
 	User: {
 		tweets: (parent: User) => prismaClient.tweet.findMany({where : {author : {id : parent.id}}}),
+
+        followers : async (parent : User) => {
+            const result = await prismaClient.follows.findMany({
+                where: { following : {id : parent.id}},
+                include: { follower : true, }
+            });
+            return result.map((el) => el.follower);
+        },
+
+        following : async (parent : User) => {
+            const result = await prismaClient.follows.findMany({
+                where: { follower : {id : parent.id}},
+                include: { following : true, }
+            });
+            return result.map((el) => el.following);
+        }
 		
 	},
 };
 
+const mutations = {
+    followUser: async(parent : any, {to} : {to : string}, context : GraphqlContext) => {
+        if(!context.user || !context.user.id) throw new Error("Unauthenticated");
 
-export const resolvers = { queries, extraResolvers  };
+        await UserService.followUser(context.user.id, to);
+        return true;
+    },
+    
+    unfollowUser: async(parent : any, {to} : {to : string}, context : GraphqlContext) => {
+        if(!context.user || !context.user.id) throw new Error("Unauthenticated");
+
+        await UserService.unfollowUser(context.user.id, to);
+        return true;
+    }  
+}
+
+
+export const resolvers = { queries, extraResolvers, mutations };
