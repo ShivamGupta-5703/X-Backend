@@ -2,6 +2,7 @@ import { prismaClient } from "../../clients/db";
 import { GraphqlContext } from "../interfaces";
 import { User } from "@prisma/client";
 import UserService from "../../services/user";
+import { redisClient } from "../../clients/redis";
 
 
 
@@ -49,7 +50,48 @@ const extraResolvers = {
                 include: { following : true, }
             });
             return result.map((el) => el.following);
-        }
+        },
+
+        recommendedUsers : async(parent : User, _ : any ,context : GraphqlContext) => {
+            // no user -> no recommended users.
+            if(!context.user || !context.user.id) return [];
+            
+            // if recommended users are cached, return cached value.
+            const cachedData = await redisClient.get(`RECOMMENDED_USERS:${context.user.id}`);
+            
+            if(cachedData){
+                //console.log("Found cache");
+                return JSON.parse(cachedData);
+            }
+
+            // find user i follow, then find their following for our recommendation
+            const myFollowing = await prismaClient.follows.findMany({
+                where : { follower : { id : context.user.id }},
+                include : { following : { include : { followers : { include : { following : true }} }}},
+            }); 
+
+            //console.log(myFollowing);
+            
+
+            const users: User[] = []
+            for (const followings of myFollowing){
+                for (const followingOfFollowedUser of followings.following.followers){
+                    // dont recommend me && if i dont follow then only recommend user
+                    if ( followingOfFollowedUser.following.id !== context.user.id &&
+                         myFollowing.findIndex(e => e?.followingId === followingOfFollowedUser.following.id) < 0){
+                        console.log(followingOfFollowedUser.following);
+                        users.push(followingOfFollowedUser.following);
+                    }
+                }
+            }
+            //console.log(users);
+
+            //console.log("Cache not found");
+            // store recommended users in redis cache, with unique key
+            await redisClient.set(`RECOMMENDED_USERS:${context.user.id}`, JSON.stringify(users));
+            
+            return users;
+        },
 		
 	},
 };
@@ -59,6 +101,9 @@ const mutations = {
         if(!context.user || !context.user.id) throw new Error("Unauthenticated");
 
         await UserService.followUser(context.user.id, to);
+
+        //whenever i change following, delete cache to see updated data.
+        await redisClient.del(`RECOMMENDED_USERS:${context.user.id}`);
         return true;
     },
     
@@ -66,6 +111,9 @@ const mutations = {
         if(!context.user || !context.user.id) throw new Error("Unauthenticated");
 
         await UserService.unfollowUser(context.user.id, to);
+
+        //whenever i change following, delete cache to see updated data.
+        await redisClient.del(`RECOMMENDED_USERS:${context.user.id}`);
         return true;
     }  
 }
