@@ -20,6 +20,10 @@ export async function initServer(){
     app.use(cors());
     app.use(cookieParser());
 
+    app.get('/' , (req,res)=>{
+      res.status(200).json({message:"Everything is good"})
+    });
+
     const graphqlServer = new ApolloServer<GraphqlContext>({
       typeDefs:`
         ${User.types}
