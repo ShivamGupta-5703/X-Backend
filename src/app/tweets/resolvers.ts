@@ -1,10 +1,10 @@
 import { GraphqlContext} from "../interfaces";
-import { prismaClient } from "../../clients/db";
 import { Tweet } from "@prisma/client";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import UserService from "../../services/user";
 import TweetService, { CreateTweetPayLoad } from "../../services/tweet";
+import { LikeService } from "../../services/like";
 
 
 
@@ -55,11 +55,37 @@ const mutations = {
 		});
 		return tweet;
 	},
+
+	likeTweet: async (
+		parent: Tweet,
+		{ payload: { tweetId } }: { payload: { tweetId: string } },
+		context: GraphqlContext
+	) => {
+		if (!context.user?.id) throw new Error("Unauthorized action");
+		const tweet = await LikeService.likeTweet({
+			tweetId: tweetId,
+			likerId: context.user.id,
+		});
+		return tweet;
+	},
+	unlikeTweet: async (
+		parent: Tweet,
+		{ payload: { tweetId } }: { payload: { tweetId: string } },
+		context: GraphqlContext
+	) => {
+		if (!context.user?.id) throw new Error("Unauthorized action");
+		const tweet = await LikeService.unlikeTweet({
+			tweetId: tweetId,
+			likerId: context.user.id,
+		});
+		return tweet;
+	},
 };
 
 const extraResolvers = {
 	Tweet: {
 		author: async (parent: Tweet) => await UserService.getUserById(parent.authorId),
+		likes: async (parent: Tweet) => await LikeService.getLikesOfTweet(parent.id),
 	},
 };
 

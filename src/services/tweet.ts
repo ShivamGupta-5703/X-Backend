@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { prismaClient } from "../clients/db";
 import { redisClient } from "../clients/redis";
 
@@ -15,7 +16,7 @@ class TweetService{
             `RATE_LIMIT:TWEET:${data.userId}`
         );
         // if limit reached throw new error.
-        if (rateLimitFlag) throw new Error("Please wait....");
+        if (rateLimitFlag) toast.error("Please wait....");
 
 
         // whenever new tweet created, delete tweets cache
